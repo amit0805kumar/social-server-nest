@@ -1,0 +1,83 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
+import { PostsService } from './posts.service';
+import { PostDto } from './dto/post.dto';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { UUID } from 'crypto';
+import {
+  createErrorResponse,
+  createResponse,
+} from 'src/common/helpers/response.helpers';
+
+@Controller('posts')
+export class PostsController {
+  constructor(private readonly postsService: PostsService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  async create(@Body() createPostDto: PostDto) {
+    try {
+      const post = await this.postsService.create(createPostDto);
+      return createResponse(post, 'Post created successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Get('all/:id')
+  @UseGuards(JwtAuthGuard)
+  async findAll(@Param('id') id: UUID) {
+    try {
+      const posts = await this.postsService.findAll(id);
+      if (!posts || posts.length === 0) {
+        return createErrorResponse('No posts found for this user', 404);
+      }
+      return createResponse(posts, 'Posts fetched successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: UUID) {
+    try {
+      return createResponse(
+        await this.postsService.findOne(id),
+        'Post fetched successfully',
+      );
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async update(@Param('id') id: UUID, @Body() updatePostDto: PostDto) {
+    try {
+      const post = this.postsService.findOne(id);
+      if (!post) {
+        return createErrorResponse(`Post with id ${id} not found`, 404);
+      }
+      return createResponse(
+        await this.postsService.update(id, updatePostDto),
+        'Post updated successfully',
+      );
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  remove(@Param('id') id: UUID) {
+    return this.postsService.remove(id);
+  }
+}
