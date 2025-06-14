@@ -52,4 +52,25 @@ export class UsersService {
   remove(id: UUID) {
     return `This action removes a #${id} user`;
   }
+
+  async followUser(userId: UUID, followUserId: UUID): Promise<User> {
+    const user = await this.userModel.findById(userId);
+    const followUser = await this.userModel.findById(followUserId);
+
+    if (!user || !followUser) {
+      throw new Error('User or follow user not found');
+    }
+
+    if (user.following && user.following.includes(followUserId)) {
+      throw new Error('You are already following this user');
+    }
+
+    user?.following?.push(followUserId);
+    followUser?.followers?.push(userId);
+
+    await user.save();
+    await followUser.save();
+
+    return user;
+  }
 }

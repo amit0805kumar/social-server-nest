@@ -16,6 +16,7 @@ import {
 } from 'src/common/helpers/response.helpers';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { use } from 'passport';
 
 @Controller('users')
 export class UsersController {
@@ -35,15 +36,19 @@ export class UsersController {
   async findAll() {
     try {
       const users = await this.usersService.findAll();
-      return createResponse(users, 'User fetched successfully')
+      return createResponse(users, 'User fetched successfully');
     } catch (error) {
       return createErrorResponse(error.message, 400);
     }
-    
   }
   @Get(':id')
   async findOne(@Param('id') id: UUID) {
-    return await this.usersService.findOne(id);
+    try {
+      const user = await this.usersService.findOne(id);
+      return createResponse(user, 'User fetched successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
   }
 
   @Patch(':id')
@@ -61,4 +66,16 @@ export class UsersController {
   async remove(@Param('id') id: UUID) {
     return await this.usersService.remove(id);
   }
+
+  @Patch('follow/:id')
+  @UseGuards(JwtAuthGuard)
+  async followUser(@Param('id') id: UUID, @Body('followUserId') followUserId: UUID) {
+    try {
+      const user = await this.usersService.followUser(id, followUserId);
+      return createResponse(user, 'User followed successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
 }

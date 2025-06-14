@@ -1,7 +1,7 @@
 import { UUID } from "crypto";
 
 export class UserDto {
-    id: UUID
+    _id?: UUID
     username: string;
     password: string;
     email: string;
@@ -19,4 +19,6 @@ export class UserDto {
     relationshipStatus?: string;
     dateOfBirth?: Date;
     coverPicture?: string;
+    following?: UUID[]; // Array of UUIDs for following users
+    followers?: UUID[]; // Array of UUIDs for followers
 }

@@ -21,6 +21,19 @@ export class Post {
 
   @Prop({required: true})
   img: string; // Optional image URL for the post
+
+  @Prop({required: true})
+  username: string; // Optional image URL for the post
+
+  @Prop()
+  profilePicture?: string; // Optional profile picture URL for the user
+
+  @Prop({default: Date.now})
+  createdAt: Date; // Optional creation date for the post
+
+  @Prop({default: Date.now})
+  updatedAt: Date; // Optional update date for the post
+
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);

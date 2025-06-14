@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { UUID } from 'crypto';
 import { Document } from 'mongoose';
 
 export type UserDocument = User & Document;
@@ -50,6 +51,12 @@ export class User {
 
   @Prop()
   dateOfBirth?: Date;
+
+  @Prop({ default: [] })
+  following?: UUID[];
+
+  @Prop({ default: [] })
+  followers?: UUID[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

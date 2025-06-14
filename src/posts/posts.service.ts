@@ -4,16 +4,19 @@ import {Post, PostDocument} from './entities/post.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UUID } from 'crypto';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class PostsService {
-  constructor(@InjectModel(Post.name) private postModel: Model<PostDocument>) {}
+  constructor(@InjectModel(Post.name) private postModel: Model<PostDocument>,
+    private readonly userService: UsersService
+) {}
   
   async create(createPostDto: PostDto): Promise<Post> {
     if (!createPostDto || !createPostDto.userId) {
       throw new Error('User ID is required to create a post');
     }
-    try {
+    try {      
       return await this.postModel.create(createPostDto);
     } catch (error) {
       throw new Error(`Error creating post: ${error.message}`);  
@@ -25,9 +28,24 @@ export class PostsService {
       if (!_id) {
         throw new Error('User ID is required to fetch posts');
       }
-      return await this.postModel.find({ userId: _id }).exec();
+      return await this.postModel.find({ userId: _id }).sort({ createdAt: -1 }).exec();
     } catch (error) {
       throw new Error(`Error fetching posts: ${error.message}`);
+    }
+  }
+
+  async findUserPosts(_id: UUID): Promise<Post[]> {
+    try {
+      if (!_id) {
+        throw new Error('User ID is required to fetch user posts');
+      }
+      const posts = await this.postModel.find({ userId: _id }).sort({ createdAt: -1 }).exec();
+      if (!posts || posts.length === 0) {
+        throw new Error(`No posts found for user with id ${_id}`);
+      }
+      return posts;
+    } catch (error) {
+      throw new Error(`Error fetching user posts with id ${_id}: ${error.message}`);
     }
   }
 
@@ -75,6 +93,35 @@ export class PostsService {
     }
   }
 
+  async findFollowingPosts(followingIds: UUID[]): Promise<Post[]> {
+    if (!followingIds || followingIds.length === 0) {
+      throw new Error('Following IDs are required to fetch following posts');
+    }
+    try {
+      return await this.postModel.find({ userId: { $in: followingIds } }).sort({ createdAt: -1 }).exec();
+    } catch (error) {
+      throw new Error(`Error fetching following posts: ${error.message}`);
+    }
+  }
+
+  async findTimelinePosts(_id: UUID): Promise<Post[]> {
+
+    try {
+      const posts = await this.findAll(_id);
+      const user = await this.userService.findOne(_id);
+
+       if(user.following && user.following.length > 0) {
+              const followingPosts = await this.findFollowingPosts(user.following);
+                return [...posts, ...followingPosts].sort((a, b) => b?.createdAt?.getTime() - a?.createdAt?.getTime());
+        }
+        return posts
+    } catch (error) {
+      throw new Error(`Error fetching timeline posts: ${error.message}`);
+    }
+  }
+
+
+  //Yet to be implemented
   remove(_id: UUID) {
     return `This action removes a #${_id} post`;
   }

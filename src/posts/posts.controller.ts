@@ -16,10 +16,11 @@ import {
   createErrorResponse,
   createResponse,
 } from 'src/common/helpers/response.helpers';
+import { UsersService } from 'src/users/users.service';
 
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly postsService: PostsService) {}
+  constructor(private readonly postsService: PostsService, private readonly usersService: UsersService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -36,11 +37,11 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   async findAll(@Param('id') id: UUID) {
     try {
-      const posts = await this.postsService.findAll(id);
-      if (!posts || posts.length === 0) {
-        return createErrorResponse('No posts found for this user', 404);
+      const userTimelinePosts = await this.postsService.findTimelinePosts(id);
+      if(userTimelinePosts && userTimelinePosts.length > 0) {
+        return createResponse(userTimelinePosts, 'Following posts fetched successfully');
       }
-      return createResponse(posts, 'Posts fetched successfully');
+      return createErrorResponse('Posts not found', 404);
     } catch (error) {
       return createErrorResponse(error.message, 400);
     }
@@ -53,6 +54,20 @@ export class PostsController {
         await this.postsService.findOne(id),
         'Post fetched successfully',
       );
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Get('user/:id')
+  @UseGuards(JwtAuthGuard)
+  async findUserPosts(@Param('id') id: UUID) {
+    try {
+      const posts = await this.postsService.findUserPosts(id);
+      if (!posts || posts.length === 0) {
+        return createErrorResponse('No posts found for this user', 404);
+      }
+      return createResponse(posts, 'User posts fetched successfully');
     } catch (error) {
       return createErrorResponse(error.message, 400);
     }
