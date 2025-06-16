@@ -34,6 +34,9 @@ export class Post {
   @Prop({default: Date.now})
   updatedAt: Date; // Optional update date for the post
 
+  @Prop({required: true, default: 'image'})
+  mediaType: 'image' | 'video'; // Optional, to specify the type of media
+
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);

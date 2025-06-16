@@ -77,7 +77,10 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   async update(@Param('id') id: UUID, @Body() updatePostDto: PostDto) {
     try {
-      const post = this.postsService.findOne(id);
+      if(!updatePostDto || !updatePostDto._id) {
+        return createErrorResponse('Post ID is required for update', 400);
+      }
+      const post = await this.postsService.findOne(updatePostDto._id);
       if (!post) {
         return createErrorResponse(`Post with id ${id} not found`, 404);
       }
@@ -86,13 +89,20 @@ export class PostsController {
         'Post updated successfully',
       );
     } catch (error) {
+      console.log('Error updating post:', error);
       return createErrorResponse(error.message, 400);
     }
   }
 
-  @Delete(':id')
+  @Delete(':userId')
   @UseGuards(JwtAuthGuard)
-  remove(@Param('id') id: UUID) {
-    return this.postsService.remove(id);
+  async remove(@Param('userId') userId: UUID, @Body() postId: {postId: UUID}) {
+    console.log('Removing post with ID:', postId, 'for user:', userId);
+    try {
+     const response =  await this.postsService.remove(userId, postId.postId);
+      return createResponse(response, 'Post deleted successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
   }
 }

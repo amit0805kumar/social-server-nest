@@ -64,20 +64,19 @@ export class PostsService {
     }
   }
 
-  async update(_id: UUID, updatePostDto: PostDto): Promise<Post> {
-    if (!_id || !updatePostDto) {
+  async update(userId: UUID, updatePostDto: PostDto): Promise<Post> {
+    if (!userId || !updatePostDto || !updatePostDto._id) {
       throw new Error('Post ID and update data are required to update a post');
     }
     if (!updatePostDto.userId) {
       throw new Error('User ID is required to update a post');
     }
-    if (updatePostDto.userId !== updatePostDto.userId) {
+    if (updatePostDto.userId !== userId) {
       throw new Error('User ID mismatch: You can only update your own posts');
     }
     try {
-      updatePostDto._id = _id; // Ensure the ID is set in the update DTO
       const updatedPost = await this.postModel.findByIdAndUpdate(
-        _id,
+        updatePostDto._id,
         updatePostDto,
         {
           new: true,
@@ -85,11 +84,11 @@ export class PostsService {
         },
       ).exec();
       if (!updatedPost) {
-        throw new Error(`Post with id ${_id} not found`);
+        throw new Error(`Post with id ${updatePostDto._id} not found`);
       }
       return updatedPost;
     } catch (error) {
-      throw new Error(`Error updating post with id ${_id}: ${error.message}`);
+      throw new Error(`Error updating post with id ${updatePostDto._id}: ${error.message}`);
     }
   }
 
@@ -122,7 +121,22 @@ export class PostsService {
 
 
   //Yet to be implemented
-  remove(_id: UUID) {
-    return `This action removes a #${_id} post`;
+  async remove(_id: UUID, postId: UUID): Promise<Post> {
+    try {
+      if (!_id || !postId) {
+        throw new Error('User ID and Post ID are required to remove a post');
+      }
+    const post = await this.postModel.findById(postId).exec();
+    if(!post || post.userId !== _id) {
+      throw new Error('User ID mismatch: You can only remove your own posts');
+    }
+    const response =  await this.postModel.findByIdAndDelete(postId).exec();
+    if (!response) {
+      throw new Error(`Post with id ${postId} not found`);
+    }
+     return response;
+    } catch (error) {
+      throw new Error(`Error removing post with id ${_id}: ${error.message}`);
+    }
   }
 }

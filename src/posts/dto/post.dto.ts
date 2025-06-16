@@ -11,4 +11,5 @@ export class PostDto {
   profilePicture?: string; // Optional profile picture URL for the user
   createdAt?: Date; // Optional, for tracking when the post was created
   updatedAt?: Date; // Optional, for tracking when the post was last updated
+  mediaType: 'image' | 'video'; // Optional, to specify the type of media
 }

@@ -19,4 +19,5 @@ export class UserDto {
     relationshipStatus?: string;
     dateOfBirth?: Date;
     coverPicture?: string;
+    mediaType?: 'image' | 'video';
 }

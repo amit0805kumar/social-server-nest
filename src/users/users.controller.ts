@@ -71,11 +71,24 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async followUser(@Param('id') id: UUID, @Body('followUserId') followUserId: UUID) {
     try {
+      
       const user = await this.usersService.followUser(id, followUserId);
       return createResponse(user, 'User followed successfully');
     } catch (error) {
       return createErrorResponse(error.message, 400);
     }
   }
+
+  @Patch('unfollow/:id')
+  @UseGuards(JwtAuthGuard)
+  async unfollowUser(@Param('id') id: UUID, @Body('followUserId') followUserId: UUID) {
+    try {
+      const user = await this.usersService.unfollowUser(id, followUserId);
+      return createResponse(user, 'User unfollowed successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
 
 }
