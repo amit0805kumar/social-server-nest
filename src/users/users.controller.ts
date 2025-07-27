@@ -89,6 +89,4 @@ export class UsersController {
       return createErrorResponse(error.message, 400);
     }
   }
-
-
 }
