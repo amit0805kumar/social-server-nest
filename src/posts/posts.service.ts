@@ -254,4 +254,31 @@ export class PostsService {
       throw new Error(`Error fetching paginated posts: ${error.message}`);
     }
   }
+
+   async createMultiplePosts(posts: PostDto[]): Promise<Post[]> {
+    if (!posts || posts.length === 0) {
+      throw new Error('At least one post is required to create multiple posts');
+    }
+
+    // Validate userId for each post
+    for (const post of posts) {
+      if (!post.userId) {
+        throw new Error('User ID is required for each post');
+      }
+    }
+
+    // Add timestamps to each post
+    const currentDate = new Date();
+    const postsToInsert = posts.map((post) => ({
+      ...post,
+      createdAt: currentDate,
+      updatedAt: currentDate,
+    }));
+
+    // Insert posts into the database
+    const createdPosts = await this.postModel.insertMany(postsToInsert);
+
+    return createdPosts;
+  }
+
 }

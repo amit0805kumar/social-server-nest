@@ -8,7 +8,7 @@ export type PostDocument = Post & Document;
 export class Post {
 
   @Prop()
-  desc: string;
+  desc?: string;
 
   @Prop({required: true})
   userId: UUID; // Reference to User ID

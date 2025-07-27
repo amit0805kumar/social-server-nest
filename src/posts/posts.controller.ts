@@ -164,4 +164,31 @@ export class PostsController {
       return createErrorResponse(error.message, 400);
     }
   }
+
+  @Post('multiple')
+  @UseGuards(JwtAuthGuard)
+  async createMultiplePosts(@Body() createPostDtos: any, @Req() req: Request) {
+    try {
+      const userId = (req.user as any).userId;
+      const username = (req.user as any).username;
+      const { imgUrls } = createPostDtos;
+      if (!userId || !imgUrls || !Array.isArray(imgUrls)) {
+        return createErrorResponse('Invalid input data', 400);
+      }
+      const currentDate = new Date();
+      const postsToInsert = imgUrls.map((imgUrl) => ({
+        userId,
+        img: imgUrl,
+        username,
+        createdAt: currentDate,
+        updatedAt: currentDate,
+        mediaType: imgUrl.toLowerCase().includes('.mp4') ? 'video' as const : 'image' as const,
+      }));
+      const createdPosts =
+        await this.postsService.createMultiplePosts(postsToInsert);
+      return createResponse(createdPosts, 'Posts created successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
 }
