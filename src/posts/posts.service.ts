@@ -5,12 +5,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UUID } from 'crypto';
 import { UsersService } from 'src/users/users.service';
+import { RedisService } from 'src/common/redis.service';
+import { REDIS_KEYS } from 'src/common/constants';
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     private readonly userService: UsersService,
+    private readonly redisService: RedisService,
   ) {}
 
   async create(createPostDto: PostDto): Promise<Post> {
@@ -29,10 +32,12 @@ export class PostsService {
       if (!_id) {
         throw new Error('User ID is required to fetch posts');
       }
-      return await this.postModel
+      const posts = await this.postModel
         .find({ userId: _id })
         .sort({ createdAt: -1 })
         .exec();
+
+      return posts;
     } catch (error) {
       throw new Error(`Error fetching posts: ${error.message}`);
     }
@@ -117,15 +122,34 @@ export class PostsService {
 
   async findTimelinePosts(_id: UUID): Promise<Post[]> {
     try {
-      const posts = await this.findAll(_id);
+      if (!_id) {
+        throw new Error('User ID is required to fetch timeline posts');
+      }
+
+      // Check cache first
+      const cachedPosts = await this.redisService.getCache(
+        `${REDIS_KEYS.USER_POSTS}:${_id}`,
+      );
+      if (cachedPosts) {
+        console.log('Cache hit for user posts');
+        return JSON.parse(cachedPosts);
+      }
+
+      let posts = await this.findUserPosts(_id);
       const user = await this.userService.findOne(_id);
 
       if (user.following && user.following.length > 0) {
         const followingPosts = await this.findFollowingPosts(user.following);
-        return [...posts, ...followingPosts].sort(
+        posts = [...posts, ...followingPosts].sort(
           (a, b) => b?.createdAt?.getTime() - a?.createdAt?.getTime(),
         );
       }
+
+      this.redisService.setCache(
+        `${REDIS_KEYS.USER_POSTS}:${_id}`,
+        JSON.stringify(posts),
+        3600, // Cache for 1 hour
+      );
       return posts;
     } catch (error) {
       throw new Error(`Error fetching timeline posts: ${error.message}`);
@@ -216,18 +240,31 @@ export class PostsService {
   }> {
     try {
       if (limit === -1) {
+
+        const cachedPosts = await this.redisService.getCache(REDIS_KEYS.ALL_POSTS);
+        if (cachedPosts) {
+          console.log('Cache hit for all posts');
+          return JSON.parse(cachedPosts);
+        }
+
         const posts = await this.postModel
           .find()
           .sort({ createdAt: -1 })
           .exec();
         const totalPosts = posts.length;
 
-        return {
+        const res=  {
           posts,
           totalPosts,
           totalPages: 1,
           currentPage: 1,
         };
+        this.redisService.setCache(
+          REDIS_KEYS.ALL_POSTS,
+          JSON.stringify(res),
+          3600, // Cache for 1 hour
+        );
+        return res;
       }
 
       const skip = (page - 1) * limit;
@@ -241,7 +278,6 @@ export class PostsService {
           .exec(),
         this.postModel.countDocuments(),
       ]);
-
       const totalPages = Math.ceil(totalPosts / limit);
 
       return {
@@ -255,7 +291,7 @@ export class PostsService {
     }
   }
 
-   async createMultiplePosts(posts: PostDto[]): Promise<Post[]> {
+  async createMultiplePosts(posts: PostDto[]): Promise<Post[]> {
     if (!posts || posts.length === 0) {
       throw new Error('At least one post is required to create multiple posts');
     }
@@ -280,5 +316,4 @@ export class PostsService {
 
     return createdPosts;
   }
-
 }
