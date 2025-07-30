@@ -322,6 +322,8 @@ export class PostsService {
     // Insert posts into the database
     const createdPosts = await this.postModel.insertMany(postsToInsert);
 
+    this.redisService.delCache(REDIS_KEYS.ALL_POSTS); // Clear cache for all posts
+    this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`); // Clear cache for user posts
     return createdPosts;
   }
 }
