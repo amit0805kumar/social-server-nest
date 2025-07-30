@@ -5,10 +5,15 @@ import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from './entities/user.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { UUID } from 'crypto';
+import { RedisService } from 'src/common/redis.service';
+import { REDIS_KEYS } from 'src/common/constants';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(createUserDto: UserDto): Promise<User> {
     try {
@@ -17,14 +22,17 @@ export class UsersService {
       return await this.userModel.create(createUserDto);
     } catch (error) {
       throw new Error(`Error creating user: ${error.message}`);
-    };
+    }
   }
 
   async findAll(): Promise<User[]> {
     try {
-      return await this.userModel.find().select('-password').exec();
+      return await this.userModel
+        .find({ isAdmin: false })
+        .select('-password')
+        .exec();
     } catch (error) {
-      throw new Error(`Error fetching users: ${error.message}`)
+      throw new Error(`Error fetching users: ${error.message}`);
     }
   }
 
@@ -41,7 +49,8 @@ export class UsersService {
       .findByIdAndUpdate(id, updateUserDto, {
         new: true,
         runValidators: true,
-      }).select('-password')
+      })
+      .select('-password')
       .exec();
     if (!updatedUser) {
       throw new Error(`User with id ${id} not found`);
@@ -71,12 +80,13 @@ export class UsersService {
     await user.save();
     await followUser.save();
 
+    this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${userId}`); // Clear cache for user posts
     return user;
   }
 
   async unfollowUser(userId: UUID, unfollowUserId: UUID): Promise<User> {
     const user = await this.userModel.findById(userId);
-    const unfollowUser = await this.userModel.findById(unfollowUserId); 
+    const unfollowUser = await this.userModel.findById(unfollowUserId);
     if (!user || !unfollowUser) {
       throw new Error('User or unfollow user not found');
     }
@@ -85,12 +95,27 @@ export class UsersService {
       throw new Error('You are not following this user');
     }
 
-    user.following = user.following.filter(id => id.toString() !== unfollowUserId.toString());
-    unfollowUser.followers =  unfollowUser.followers?.filter(id => id.toString() !== userId.toString());
+    user.following = user.following.filter(
+      (id) => id.toString() !== unfollowUserId.toString(),
+    );
+    unfollowUser.followers = unfollowUser.followers?.filter(
+      (id) => id.toString() !== userId.toString(),
+    );
 
     await user.save();
     await unfollowUser.save();
-
+    this.redisService.setCache(`${REDIS_KEYS.USER_POSTS}:${userId}`, '', 0);
     return user;
+  }
+
+  async getAllAdminUsers(): Promise<UserDocument[]> {
+    try {
+      return await this.userModel
+        .find({ isAdmin: true })
+        .select('-password')
+        .exec();
+    } catch (error) {
+      throw new Error(`Error fetching admin users: ${error.message}`);
+    }
   }
 }

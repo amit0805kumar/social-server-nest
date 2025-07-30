@@ -25,4 +25,12 @@ export class RedisService {
       return null;
     }
   }
+
+  async delCache(key: string): Promise<void> {
+    try {
+      await this.redisClient.del(key);
+    } catch (error) {
+      this.logger.error(`Failed to delete cache for key ${key}: ${error.message}`);
+    }
+  }
 }

@@ -145,12 +145,12 @@ export class PostsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  async findAllPosts(@Query('page') page = 1, @Query('limit') limit = 10) {
+  async findAllAdminPosts(@Query('page') page = 1, @Query('limit') limit = 10) {
     try {
       const pageNumber = parseInt(page as any, 10);
       const limitNumber = parseInt(limit as any, 10);
 
-      const result = await this.postsService.findAllPosts(
+      const result = await this.postsService.findAllAdminPosts(
         pageNumber,
         limitNumber,
       );

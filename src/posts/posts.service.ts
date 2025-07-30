@@ -21,6 +21,8 @@ export class PostsService {
       throw new Error('User ID is required to create a post');
     }
     try {
+      this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${createPostDto.userId}`); // Clear cache for user posts
+      this.redisService.delCache(REDIS_KEYS.ALL_POSTS);
       return await this.postModel.create(createPostDto);
     } catch (error) {
       throw new Error(`Error creating post: ${error.message}`);
@@ -170,6 +172,8 @@ export class PostsService {
       if (!response) {
         throw new Error(`Post with id ${postId} not found`);
       }
+      this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${post.userId}`);
+      this.redisService.delCache(REDIS_KEYS.ALL_POSTS);
       return response;
     } catch (error) {
       throw new Error(`Error removing post with id ${_id}: ${error.message}`);
@@ -229,7 +233,7 @@ export class PostsService {
     }
   }
 
-  async findAllPosts(
+  async findAllAdminPosts(
     page = 1,
     limit = 10,
   ): Promise<{
@@ -247,8 +251,12 @@ export class PostsService {
           return JSON.parse(cachedPosts);
         }
 
+       const adminUserIds = await this.userService.getAllAdminUsers();
+        
         const posts = await this.postModel
-          .find()
+          .find({
+            userId: { $in: adminUserIds.map(user => user._id) },
+          })
           .sort({ createdAt: -1 })
           .exec();
         const totalPosts = posts.length;
