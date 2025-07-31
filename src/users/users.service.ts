@@ -118,4 +118,24 @@ export class UsersService {
       throw new Error(`Error fetching admin users: ${error.message}`);
     }
   }
+
+  async changePassword(
+    userId: UUID,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<User> {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new Error(`User with id ${userId} not found`);
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      throw new Error('Old password is incorrect');
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    return user;
+  }
 }

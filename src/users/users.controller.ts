@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserDto } from './dto/user.dto';
@@ -16,7 +17,7 @@ import {
 } from 'src/common/helpers/response.helpers';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { use } from 'passport';
+import { Request } from 'express';
 
 @Controller('users')
 export class UsersController {
@@ -69,9 +70,11 @@ export class UsersController {
 
   @Patch('follow/:id')
   @UseGuards(JwtAuthGuard)
-  async followUser(@Param('id') id: UUID, @Body('followUserId') followUserId: UUID) {
+  async followUser(
+    @Param('id') id: UUID,
+    @Body('followUserId') followUserId: UUID,
+  ) {
     try {
-      
       const user = await this.usersService.followUser(id, followUserId);
       return createResponse(user, 'User followed successfully');
     } catch (error) {
@@ -81,11 +84,34 @@ export class UsersController {
 
   @Patch('unfollow/:id')
   @UseGuards(JwtAuthGuard)
-  async unfollowUser(@Param('id') id: UUID, @Body('followUserId') followUserId: UUID) {
+  async unfollowUser(
+    @Param('id') id: UUID,
+    @Body('followUserId') followUserId: UUID,
+  ) {
     try {
       const user = await this.usersService.unfollowUser(id, followUserId);
       return createResponse(user, 'User unfollowed successfully');
     } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Patch('change-password/:id')
+  @UseGuards(JwtAuthGuard)
+  async changePassword(
+    @Body() body: { oldPassword: string; newPassword: string },
+    @Param('id') id: UUID
+  ) {
+    try {
+      console.log(body)
+      const user = await this.usersService.changePassword(
+        id,
+        body.oldPassword,
+        body.newPassword,
+      );
+      return createResponse(user, 'Password changed successfully');
+    } catch (error) {
+      console.error('Error changing password:', error);
       return createErrorResponse(error.message, 400);
     }
   }
