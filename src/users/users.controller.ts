@@ -103,7 +103,6 @@ export class UsersController {
     @Param('id') id: UUID
   ) {
     try {
-      console.log(body)
       const user = await this.usersService.changePassword(
         id,
         body.oldPassword,
