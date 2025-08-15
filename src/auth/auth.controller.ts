@@ -37,9 +37,11 @@ export class AuthController {
 
       res.cookie('token', data.token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // true for HTTPS
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure: true, // true for HTTPS
+        sameSite: 'none',
         maxAge: 24 * 60 * 60 * 1000, // 1 day
+        domain: 'social-nn-pro.netlify.app', // if you set domain
+        path: '/',
       });
 
       return createResponse(data, 'Login successful');
@@ -66,8 +68,10 @@ export class AuthController {
     // Clear token cookie
     res.clearCookie('token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: true, // same as when you set it
+      sameSite: 'none',
+      domain: 'social-nn-pro.netlify.app',
+      path: '/',
     });
 
     // Optionally remove token from Redis (if using token blacklist)
