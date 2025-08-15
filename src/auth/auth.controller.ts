@@ -40,7 +40,6 @@ export class AuthController {
         secure: true, // true for HTTPS
         sameSite: 'none',
         maxAge: 24 * 60 * 60 * 1000, // 1 day
-        domain: 'social-nn-pro.netlify.app', // if you set domain
         path: '/',
       });
 
@@ -70,7 +69,6 @@ export class AuthController {
       httpOnly: true,
       secure: true, // same as when you set it
       sameSite: 'none',
-      domain: 'social-nn-pro.netlify.app',
       path: '/',
     });
 
