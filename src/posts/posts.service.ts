@@ -21,7 +21,9 @@ export class PostsService {
       throw new Error('User ID is required to create a post');
     }
     try {
-      this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${createPostDto.userId}`); // Clear cache for user posts
+      this.redisService.delCache(
+        `${REDIS_KEYS.USER_POSTS}:${createPostDto.userId}`,
+      ); // Clear cache for user posts
       this.redisService.delCache(REDIS_KEYS.ALL_POSTS);
       return await this.postModel.create(createPostDto);
     } catch (error) {
@@ -244,8 +246,9 @@ export class PostsService {
   }> {
     try {
       if (limit === -1) {
-
-        const cachedPosts = await this.redisService.getCache(REDIS_KEYS.ALL_POSTS);
+        const cachedPosts = await this.redisService.getCache(
+          REDIS_KEYS.ALL_POSTS,
+        );
         if (cachedPosts) {
           console.log('Cache hit for all posts');
           return JSON.parse(cachedPosts);
@@ -261,7 +264,7 @@ export class PostsService {
           .exec();
         const totalPosts = posts.length;
 
-        const res=  {
+        const res = {
           posts,
           totalPosts,
           totalPages: 1,

@@ -191,4 +191,15 @@ export class PostsController {
       return createErrorResponse(error.message, 400);
     }
   }
+
+  @Post('getUrls')
+  @UseGuards(JwtAuthGuard)
+  async getUrls(@Body() body: { folder: string }) {
+    try {
+      const { folder } = body;
+      
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
 }

@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [];
   const app = await NestFactory.create(AppModule);
+   app.use(cookieParser());
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin like mobile apps or curl

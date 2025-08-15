@@ -7,6 +7,9 @@ import { AuthController } from './auth.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/users/entities/user.schema';
+import { UsersService } from 'src/users/users.service';
+import { RedisModule } from 'src/redis.module';
+
 
 @Module({
   imports: [
@@ -24,8 +27,10 @@ import { User, UserSchema } from 'src/users/entities/user.schema';
         schema: UserSchema,
       },
     ]),
+  RedisModule
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [UsersService, AuthService, JwtStrategy],
   controllers: [AuthController],
+  exports: [UsersService, AuthService, JwtModule, RedisModule],
 })
 export class AuthModule {}
