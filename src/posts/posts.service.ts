@@ -113,8 +113,11 @@ export class PostsService {
       if (!_id) {
         throw new Error('User ID is required to fetch user posts');
       }
-      if(limit == -1){
-        const temp =  await this.postModel.find({ userId: _id }).sort({ createdAt: -1 }).exec();
+      if (limit == -1) {
+        const temp = await this.postModel
+          .find({ userId: _id })
+          .sort({ createdAt: -1 })
+          .exec();
         return {
           posts: temp,
           total: temp.length,
@@ -218,7 +221,9 @@ export class PostsService {
       if (!response) {
         throw new Error(`Post with id ${postId} not found`);
       }
-      this.redisService.delCacheByPrefix(`${REDIS_KEYS.USER_POSTS}:${post.userId}`);
+      this.redisService.delCacheByPrefix(
+        `${REDIS_KEYS.USER_POSTS}:${post.userId}`,
+      );
       this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
       return response;
     } catch (error) {
@@ -321,12 +326,10 @@ export class PostsService {
         const skip = (page - 1) * limit;
 
         [posts, totalPosts] = await Promise.all([
-          this.postModel
-            .find({ userId: { $in: adminIds } })
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .exec(),
+          this.postModel.aggregate([
+            { $match: { userId: { $in: adminIds } } },
+            { $sample: { size: limit } }, // returns `limit` number of random docs
+          ]),
           this.postModel.countDocuments({ userId: { $in: adminIds } }),
         ]);
 
@@ -377,8 +380,10 @@ export class PostsService {
     const createdPosts = await this.postModel.insertMany(postsToInsert);
 
     // Delete all cache keys that start with REDIS_KEYS.ALL_POSTS
-     this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
-     this.redisService.delCacheByPrefix(`${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`); // Clear cache for user posts
+    this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
+    this.redisService.delCacheByPrefix(
+      `${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`,
+    ); // Clear cache for user posts
     return createdPosts;
   }
 }
