@@ -21,10 +21,10 @@ export class PostsService {
       throw new Error('User ID is required to create a post');
     }
     try {
-      this.redisService.delCache(
+      this.redisService.delCacheByPrefix(
         `${REDIS_KEYS.USER_POSTS}:${createPostDto.userId}`,
       ); // Clear cache for user posts
-      this.redisService.delCache(REDIS_KEYS.ALL_POSTS);
+      this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
       return await this.postModel.create(createPostDto);
     } catch (error) {
       throw new Error(`Error creating post: ${error.message}`);
@@ -218,8 +218,8 @@ export class PostsService {
       if (!response) {
         throw new Error(`Post with id ${postId} not found`);
       }
-      this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${post.userId}`);
-      this.redisService.delCache(REDIS_KEYS.ALL_POSTS);
+      this.redisService.delCacheByPrefix(`${REDIS_KEYS.USER_POSTS}:${post.userId}`);
+      this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
       return response;
     } catch (error) {
       throw new Error(`Error removing post with id ${_id}: ${error.message}`);
@@ -376,8 +376,9 @@ export class PostsService {
     // Insert posts into the database
     const createdPosts = await this.postModel.insertMany(postsToInsert);
 
-    this.redisService.delCache(REDIS_KEYS.ALL_POSTS); // Clear cache for all posts
-    this.redisService.delCache(`${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`); // Clear cache for user posts
+    // Delete all cache keys that start with REDIS_KEYS.ALL_POSTS
+     this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
+     this.redisService.delCacheByPrefix(`${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`); // Clear cache for user posts
     return createdPosts;
   }
 }

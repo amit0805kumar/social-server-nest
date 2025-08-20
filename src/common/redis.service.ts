@@ -33,4 +33,11 @@ export class RedisService {
       this.logger.error(`Failed to delete cache for key ${key}: ${error.message}`);
     }
   }
+
+  async delCacheByPrefix(prefix: string): Promise<void> {
+  const keys = await this.redisClient.keys(`${prefix}*`);
+  if (keys.length > 0) {
+    await this.redisClient.del(...keys);
+  }
+}
 }
