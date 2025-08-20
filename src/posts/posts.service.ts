@@ -47,26 +47,6 @@ export class PostsService {
     }
   }
 
-  async findUserPosts(_id: UUID): Promise<Post[]> {
-    try {
-      if (!_id) {
-        throw new Error('User ID is required to fetch user posts');
-      }
-      const posts = await this.postModel
-        .find({ userId: _id })
-        .sort({ createdAt: -1 })
-        .exec();
-      if (!posts || posts.length === 0) {
-        throw new Error(`No posts found for user with id ${_id}`);
-      }
-      return posts;
-    } catch (error) {
-      throw new Error(
-        `Error fetching user posts with id ${_id}: ${error.message}`,
-      );
-    }
-  }
-
   async findOne(_id: UUID): Promise<Post> {
     try {
       if (!_id) {
@@ -124,37 +104,101 @@ export class PostsService {
     }
   }
 
-  async findTimelinePosts(_id: UUID): Promise<Post[]> {
+  async findUserPosts(
+    _id: UUID,
+    skip: number,
+    limit: number,
+  ): Promise<{ posts: Post[]; total: number }> {
+    try {
+      if (!_id) {
+        throw new Error('User ID is required to fetch user posts');
+      }
+      if(limit == -1){
+        const temp =  await this.postModel.find({ userId: _id }).sort({ createdAt: -1 }).exec();
+        return {
+          posts: temp,
+          total: temp.length,
+        };
+      }
+      const posts = await this.postModel
+        .find({ userId: _id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      if (!posts || posts.length === 0) {
+        throw new Error(`No posts found for user with id ${_id}`);
+      }
+      return {
+        posts,
+        total: posts.length,
+      };
+    } catch (error) {
+      throw new Error(
+        `Error fetching user posts with id ${_id}: ${error.message}`,
+      );
+    }
+  }
+
+  async findTimelinePosts(
+    _id: UUID,
+    page: number,
+    limit: number,
+  ): Promise<{
+    data: Post[];
+    total: number;
+    totalPages: number;
+    currentPage: number;
+  }> {
     try {
       if (!_id) {
         throw new Error('User ID is required to fetch timeline posts');
       }
 
-      // Check cache first
-      const cachedPosts = await this.redisService.getCache(
-        `${REDIS_KEYS.USER_POSTS}:${_id}`,
-      );
+      const cacheKey = `${REDIS_KEYS.USER_POSTS}:${_id}:${page}:${limit}`;
+      const cachedPosts = await this.redisService.getCache(cacheKey);
       if (cachedPosts) {
-        console.log('Cache hit for user posts');
+        console.log('Cache hit for user timeline');
         return JSON.parse(cachedPosts);
       }
 
-      let posts = await this.findUserPosts(_id);
+      const skip = (page - 1) * limit;
+
+      // Get user details and following
       const user = await this.userService.findOne(_id);
+      const followingIds = user.following || [];
 
-      if (user.following && user.following.length > 0) {
-        const followingPosts = await this.findFollowingPosts(user.following);
-        posts = [...posts, ...followingPosts].sort(
-          (a, b) => b?.createdAt?.getTime() - a?.createdAt?.getTime(),
-        );
-      }
+      // Fetch posts from user and following in parallel
+      const [userPosts, followingPosts] = await Promise.all([
+        this.findUserPosts(_id, 1, -1), // fetch all posts for user
+        followingIds.length > 0
+          ? this.findFollowingPosts(followingIds) // fetch all posts from following
+          : [],
+      ]);
 
-      this.redisService.setCache(
-        `${REDIS_KEYS.USER_POSTS}:${_id}`,
-        JSON.stringify(posts),
-        3600, // Cache for 1 hour
+      // Merge and sort all posts
+      const allPosts = [...userPosts.posts, ...followingPosts].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
       );
-      return posts;
+
+      const total = allPosts.length;
+      const totalPages = Math.ceil(total / limit);
+
+      // Apply pagination
+      const paginatedPosts = allPosts.slice(skip, skip + limit);
+
+      const result = {
+        data: paginatedPosts,
+        total,
+        totalPages,
+        currentPage: page,
+      };
+
+      // Cache final paginated response
+      await this.redisService.setCache(cacheKey, JSON.stringify(result), 3600);
+
+      return result;
     } catch (error) {
       throw new Error(`Error fetching timeline posts: ${error.message}`);
     }
@@ -245,58 +289,65 @@ export class PostsService {
     currentPage: number;
   }> {
     try {
-      if (limit === -1) {
-        const cachedPosts = await this.redisService.getCache(
-          REDIS_KEYS.ALL_POSTS,
-        );
-        if (cachedPosts) {
-          console.log('Cache hit for all posts');
-          return JSON.parse(cachedPosts);
-        }
+      // ✅ Use dynamic cache key for pagination
+      const cacheKey =
+        limit === -1
+          ? REDIS_KEYS.ALL_POSTS // full list cache
+          : `${REDIS_KEYS.ALL_POSTS}_${page}_${limit}`; // paginated cache
 
-       const adminUserIds = await this.userService.getAllAdminUsers();
-        
-        const posts = await this.postModel
-          .find({
-            userId: { $in: adminUserIds.map(user => user._id) },
-          })
-          .sort({ createdAt: -1 })
-          .exec();
-        const totalPosts = posts.length;
-
-        const res = {
-          posts,
-          totalPosts,
-          totalPages: 1,
-          currentPage: 1,
-        };
-        this.redisService.setCache(
-          REDIS_KEYS.ALL_POSTS,
-          JSON.stringify(res),
-          3600, // Cache for 1 hour
-        );
-        return res;
+      const cachedPosts = await this.redisService.getCache(cacheKey);
+      if (cachedPosts) {
+        console.log(`Cache hit for key: ${cacheKey}`);
+        return JSON.parse(cachedPosts);
       }
 
-      const skip = (page - 1) * limit;
+      const adminUserIds = await this.userService.getAllAdminUsers();
+      const adminIds = adminUserIds.map((user) => user._id);
 
-      const [posts, totalPosts] = await Promise.all([
-        this.postModel
-          .find()
+      let posts: Post[];
+      let totalPosts: number;
+      let totalPages: number;
+
+      if (limit === -1) {
+        // ✅ Fetch all posts for admins
+        posts = await this.postModel
+          .find({ userId: { $in: adminIds } })
           .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .exec(),
-        this.postModel.countDocuments(),
-      ]);
-      const totalPages = Math.ceil(totalPosts / limit);
+          .exec();
+        totalPosts = posts.length;
+        totalPages = 1;
+      } else {
+        // ✅ Paginated fetch
+        const skip = (page - 1) * limit;
 
-      return {
+        [posts, totalPosts] = await Promise.all([
+          this.postModel
+            .find({ userId: { $in: adminIds } })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .exec(),
+          this.postModel.countDocuments({ userId: { $in: adminIds } }),
+        ]);
+
+        totalPages = Math.ceil(totalPosts / limit);
+      }
+
+      const response = {
         posts,
         totalPosts,
         totalPages,
         currentPage: page,
       };
+
+      // ✅ Set cache with an expiry
+      await this.redisService.setCache(
+        cacheKey,
+        JSON.stringify(response),
+        3600,
+      );
+
+      return response;
     } catch (error) {
       throw new Error(`Error fetching paginated posts: ${error.message}`);
     }

@@ -39,18 +39,33 @@ export class PostsController {
     }
   }
 
-  @Get('all/:id')
+  @Get('all')
   @UseGuards(JwtAuthGuard)
-  async findAll(@Param('id') id: UUID) {
+  async findAll(@Query('id') id: UUID,@Query('page') page = 1, @Query('limit') limit = 10) {
     try {
-      const userTimelinePosts = await this.postsService.findTimelinePosts(id);
-      if (userTimelinePosts && userTimelinePosts.length > 0) {
+      const userTimelinePosts = await this.postsService.findTimelinePosts(id, page, limit);
+      if (userTimelinePosts && userTimelinePosts.total > 0) {
         return createResponse(
           userTimelinePosts,
           'Following posts fetched successfully',
         );
       }
       return createErrorResponse('Posts not found', 404);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Get('user')
+  @UseGuards(JwtAuthGuard)
+  async findUserPosts(@Query('id') id: UUID,@Query('page') page = 1, @Query('limit') limit = 10) {
+    try {
+      const posts = await this.postsService.findUserPosts(id, page, limit);
+      if (!posts || posts.total === 0) {
+        return createErrorResponse('No posts found for this user', 404);
+      }
+      return createResponse(posts, 'User posts fetched successfully');
     } catch (error) {
       return createErrorResponse(error.message, 400);
     }
@@ -63,20 +78,6 @@ export class PostsController {
         await this.postsService.findOne(id),
         'Post fetched successfully',
       );
-    } catch (error) {
-      return createErrorResponse(error.message, 400);
-    }
-  }
-
-  @Get('user/:id')
-  @UseGuards(JwtAuthGuard)
-  async findUserPosts(@Param('id') id: UUID) {
-    try {
-      const posts = await this.postsService.findUserPosts(id);
-      if (!posts || posts.length === 0) {
-        return createErrorResponse('No posts found for this user', 404);
-      }
-      return createResponse(posts, 'User posts fetched successfully');
     } catch (error) {
       return createErrorResponse(error.message, 400);
     }
@@ -192,14 +193,4 @@ export class PostsController {
     }
   }
 
-  @Post('getUrls')
-  @UseGuards(JwtAuthGuard)
-  async getUrls(@Body() body: { folder: string }) {
-    try {
-      const { folder } = body;
-      
-    } catch (error) {
-      return createErrorResponse(error.message, 400);
-    }
-  }
 }
