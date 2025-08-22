@@ -383,4 +383,13 @@ export class PostsService {
     // Clear cache for user posts
     return createdPosts;
   }
+
+  async deletePostByUrl (urls: string[]): Promise<any> {
+    try {
+      const result = await this.postModel.deleteMany({ url: { $in: urls } });
+      return result;
+    } catch (error) {
+      throw new Error(`Error deleting posts by URL: ${error.message}`);
+    }
+  }
 }

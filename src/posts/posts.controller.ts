@@ -41,9 +41,17 @@ export class PostsController {
 
   @Get('all')
   @UseGuards(JwtAuthGuard)
-  async findAll(@Query('id') id: UUID,@Query('page') page = 1, @Query('limit') limit = 10) {
+  async findAll(
+    @Query('id') id: UUID,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
     try {
-      const userTimelinePosts = await this.postsService.findTimelinePosts(id, page, limit);
+      const userTimelinePosts = await this.postsService.findTimelinePosts(
+        id,
+        page,
+        limit,
+      );
       if (userTimelinePosts && userTimelinePosts.total > 0) {
         return createResponse(
           userTimelinePosts,
@@ -59,7 +67,11 @@ export class PostsController {
 
   @Get('user')
   @UseGuards(JwtAuthGuard)
-  async findUserPosts(@Query('id') id: UUID,@Query('page') page = 1, @Query('limit') limit = 10) {
+  async findUserPosts(
+    @Query('id') id: UUID,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
     try {
       const posts = await this.postsService.findUserPosts(id, page, limit);
       if (!posts || posts.total === 0) {
@@ -100,6 +112,20 @@ export class PostsController {
       );
     } catch (error) {
       console.log('Error updating post:', error);
+      return createErrorResponse(error.message, 400);
+    }
+  }
+
+  @Delete('by-urls')
+  // @UseGuards(JwtAuthGuard)
+  async deletePostsByUrls(
+    @Body() body: { urls: string[] },
+    @Req() req: Request,
+  ) {
+    try {
+      const result = await this.postsService.deletePostByUrl(body.urls);
+      return createResponse(result, 'Posts deleted successfully');
+    } catch (error) {
       return createErrorResponse(error.message, 400);
     }
   }
@@ -183,7 +209,9 @@ export class PostsController {
         username,
         createdAt: currentDate,
         updatedAt: currentDate,
-        mediaType: imgUrl.toLowerCase().includes('.mp4') ? 'video' as const : 'image' as const,
+        mediaType: imgUrl.toLowerCase().includes('.mp4')
+          ? ('video' as const)
+          : ('image' as const),
       }));
       const createdPosts =
         await this.postsService.createMultiplePosts(postsToInsert);
@@ -192,5 +220,4 @@ export class PostsController {
       return createErrorResponse(error.message, 400);
     }
   }
-
 }
