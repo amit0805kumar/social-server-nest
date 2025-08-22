@@ -21,10 +21,11 @@ export class PostsService {
       throw new Error('User ID is required to create a post');
     }
     try {
-      this.redisService.delCacheByPrefix(
-        `${REDIS_KEYS.USER_POSTS}:${createPostDto.userId}`,
-      ); // Clear cache for user posts
-      this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
+      // this.redisService.delCacheByPrefix(
+      //   `${REDIS_KEYS.USER_POSTS}:${createPostDto.userId}`,
+      // );
+      // Clear cache for user posts
+      // this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
       return await this.postModel.create(createPostDto);
     } catch (error) {
       throw new Error(`Error creating post: ${error.message}`);
@@ -90,19 +91,20 @@ export class PostsService {
     }
   }
 
-  async findFollowingPosts(followingIds: UUID[]): Promise<Post[]> {
-    if (!followingIds || followingIds.length === 0) {
-      throw new Error('Following IDs are required to fetch following posts');
-    }
-    try {
-      return await this.postModel
-        .find({ userId: { $in: followingIds } })
-        .sort({ createdAt: -1 })
-        .exec();
-    } catch (error) {
-      throw new Error(`Error fetching following posts: ${error.message}`);
-    }
-  }
+// async findFollowingPosts(followingIds: UUID[]): Promise<Post[]> {
+//   if (!followingIds || followingIds.length === 0) {
+//     throw new Error('Following IDs are required to fetch following posts');
+//   }
+
+//   try {
+//     return await this.postModel
+//       .find({ userId: { $in: followingIds } })
+//       .sort({ createdAt: -1 })
+//       .exec();
+//   } catch (error) {
+//     throw new Error(`Error fetching following posts: ${error.message}`);
+//   }
+// }
 
   async findUserPosts(
     _id: UUID,
@@ -145,67 +147,60 @@ export class PostsService {
   }
 
   async findTimelinePosts(
-    _id: UUID,
-    page: number,
-    limit: number,
-  ): Promise<{
-    data: Post[];
-    total: number;
-    totalPages: number;
-    currentPage: number;
-  }> {
-    try {
-      if (!_id) {
-        throw new Error('User ID is required to fetch timeline posts');
-      }
-
-      const cacheKey = `${REDIS_KEYS.USER_POSTS}:${_id}:${page}:${limit}`;
-      const cachedPosts = await this.redisService.getCache(cacheKey);
-      if (cachedPosts) {
-        console.log('Cache hit for user timeline');
-        return JSON.parse(cachedPosts);
-      }
-
-      const skip = (page - 1) * limit;
-
-      // Get user details and following
-      const user = await this.userService.findOne(_id);
-      const followingIds = user.following || [];
-
-      // Fetch posts from user and following in parallel
-      const [userPosts, followingPosts] = await Promise.all([
-        this.findUserPosts(_id, 1, -1), // fetch all posts for user
-        followingIds.length > 0
-          ? this.findFollowingPosts(followingIds) // fetch all posts from following
-          : [],
-      ]);
-
-      // Merge and sort all posts
-      const allPosts = [...userPosts.posts, ...followingPosts].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-      );
-
-      const total = allPosts.length;
-      const totalPages = Math.ceil(total / limit);
-
-      // Apply pagination
-      const paginatedPosts = allPosts.slice(skip, skip + limit);
-
-      const result = {
-        data: paginatedPosts,
-        total,
-        totalPages,
-        currentPage: page,
-      };
-
-      // Cache final paginated response
-      await this.redisService.setCache(cacheKey, JSON.stringify(result), 3600);
-
-      return result;
-    } catch (error) {
-      throw new Error(`Error fetching timeline posts: ${error.message}`);
-    }
+  _id: UUID,
+  page: number,
+  limit: number,
+): Promise<{
+  data: Post[];
+  total: number;
+  totalPages: number;
+  currentPage: number;
+}> {
+  if (!_id) {
+    throw new Error('User ID is required to fetch timeline posts');
   }
+
+  // Ensure page and limit are valid
+  const currentPage = Math.max(1, page);
+  const pageSize = Math.max(1, limit);
+
+  // Get the user and following IDs
+  const user = await this.userService.findOne(_id);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const followingIds = user.following || [];
+
+  // Include the user's own posts in the timeline
+  const userAndFollowingIds = [_id, ...followingIds];
+
+  // Prepare query for timeline posts
+  const query = { userId: { $in: userAndFollowingIds } };
+
+  // Calculate skip
+  const skip = (currentPage - 1) * pageSize;
+
+  // Fetch posts with pagination
+  const [posts, total] = await Promise.all([
+    this.postModel
+      .find(query)
+      .sort({ createdAt: -1 }) // Sort by latest first
+      .skip(skip)
+      .limit(pageSize)
+      .lean(), // lean for performance
+
+    this.postModel.countDocuments(query),
+  ]);
+
+  return {
+    data: posts,
+    total,
+    totalPages: Math.ceil(total / pageSize),
+    currentPage,
+  };
+}
+
 
   //Yet to be implemented
   async remove(_id: UUID, postId: UUID): Promise<Post> {
@@ -221,10 +216,10 @@ export class PostsService {
       if (!response) {
         throw new Error(`Post with id ${postId} not found`);
       }
-      this.redisService.delCacheByPrefix(
-        `${REDIS_KEYS.USER_POSTS}:${post.userId}`,
-      );
-      this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
+      // this.redisService.delCacheByPrefix(
+      //   `${REDIS_KEYS.USER_POSTS}:${post.userId}`,
+      // );
+      // this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
       return response;
     } catch (error) {
       throw new Error(`Error removing post with id ${_id}: ${error.message}`);
@@ -300,11 +295,11 @@ export class PostsService {
           ? REDIS_KEYS.ALL_POSTS // full list cache
           : `${REDIS_KEYS.ALL_POSTS}_${page}_${limit}`; // paginated cache
 
-      const cachedPosts = await this.redisService.getCache(cacheKey);
-      if (cachedPosts) {
-        console.log(`Cache hit for key: ${cacheKey}`);
-        return JSON.parse(cachedPosts);
-      }
+      // const cachedPosts = await this.redisService.getCache(cacheKey);
+      // if (cachedPosts) {
+      //   console.log(`Cache hit for key: ${cacheKey}`);
+      //   return JSON.parse(cachedPosts);
+      // }
 
       const adminUserIds = await this.userService.getAllAdminUsers();
       const adminIds = adminUserIds.map((user) => user._id);
@@ -322,14 +317,15 @@ export class PostsService {
         totalPosts = posts.length;
         totalPages = 1;
       } else {
-        // ✅ Paginated fetch
         const skip = (page - 1) * limit;
 
         [posts, totalPosts] = await Promise.all([
-          this.postModel.aggregate([
-            { $match: { userId: { $in: adminIds } } },
-            { $sample: { size: limit } }, // returns `limit` number of random docs
-          ]),
+          this.postModel
+            .find({ userId: { $in: adminIds } })
+            .skip(skip)
+            .limit(limit)
+            .lean()
+            .exec(),
           this.postModel.countDocuments({ userId: { $in: adminIds } }),
         ]);
 
@@ -344,11 +340,11 @@ export class PostsService {
       };
 
       // ✅ Set cache with an expiry
-      await this.redisService.setCache(
-        cacheKey,
-        JSON.stringify(response),
-        3600,
-      );
+      // await this.redisService.setCache(
+      //   cacheKey,
+      //   JSON.stringify(response),
+      //   3600,
+      // );
 
       return response;
     } catch (error) {
@@ -380,10 +376,11 @@ export class PostsService {
     const createdPosts = await this.postModel.insertMany(postsToInsert);
 
     // Delete all cache keys that start with REDIS_KEYS.ALL_POSTS
-    this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
-    this.redisService.delCacheByPrefix(
-      `${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`,
-    ); // Clear cache for user posts
+    // this.redisService.delCacheByPrefix(REDIS_KEYS.ALL_POSTS);
+    // this.redisService.delCacheByPrefix(
+    //   `${REDIS_KEYS.USER_POSTS}:${posts[0].userId}`,
+    // );
+    // Clear cache for user posts
     return createdPosts;
   }
 }
