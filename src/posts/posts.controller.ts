@@ -117,7 +117,7 @@ export class PostsController {
   }
 
   @Delete('by-urls')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async deletePostsByUrls(
     @Body() body: { urls: string[] },
     @Req() req: Request,
