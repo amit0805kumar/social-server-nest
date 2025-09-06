@@ -91,20 +91,20 @@ export class PostsService {
     }
   }
 
-// async findFollowingPosts(followingIds: UUID[]): Promise<Post[]> {
-//   if (!followingIds || followingIds.length === 0) {
-//     throw new Error('Following IDs are required to fetch following posts');
-//   }
+  // async findFollowingPosts(followingIds: UUID[]): Promise<Post[]> {
+  //   if (!followingIds || followingIds.length === 0) {
+  //     throw new Error('Following IDs are required to fetch following posts');
+  //   }
 
-//   try {
-//     return await this.postModel
-//       .find({ userId: { $in: followingIds } })
-//       .sort({ createdAt: -1 })
-//       .exec();
-//   } catch (error) {
-//     throw new Error(`Error fetching following posts: ${error.message}`);
-//   }
-// }
+  //   try {
+  //     return await this.postModel
+  //       .find({ userId: { $in: followingIds } })
+  //       .sort({ createdAt: -1 })
+  //       .exec();
+  //   } catch (error) {
+  //     throw new Error(`Error fetching following posts: ${error.message}`);
+  //   }
+  // }
 
   async findUserPosts(
     _id: UUID,
@@ -147,60 +147,59 @@ export class PostsService {
   }
 
   async findTimelinePosts(
-  _id: UUID,
-  page: number,
-  limit: number,
-): Promise<{
-  data: Post[];
-  total: number;
-  totalPages: number;
-  currentPage: number;
-}> {
-  if (!_id) {
-    throw new Error('User ID is required to fetch timeline posts');
+    _id: UUID,
+    page: number,
+    limit: number,
+  ): Promise<{
+    data: Post[];
+    total: number;
+    totalPages: number;
+    currentPage: number;
+  }> {
+    if (!_id) {
+      throw new Error('User ID is required to fetch timeline posts');
+    }
+
+    // Ensure page and limit are valid
+    const currentPage = Math.max(1, page);
+    const pageSize = Math.max(1, limit);
+
+    // Get the user and following IDs
+    const user = await this.userService.findOne(_id);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const followingIds = user.following || [];
+
+    // Include the user's own posts in the timeline
+    const userAndFollowingIds = [_id, ...followingIds];
+
+    // Prepare query for timeline posts
+    const query = { userId: { $in: userAndFollowingIds } };
+
+    // Calculate skip
+    const skip = (currentPage - 1) * pageSize;
+
+    // Fetch posts with pagination
+    const [posts, total] = await Promise.all([
+      this.postModel
+        .find(query)
+        .sort({ createdAt: -1 }) // Sort by latest first
+        .skip(skip)
+        .limit(pageSize)
+        .lean(), // lean for performance
+
+      this.postModel.countDocuments(query),
+    ]);
+
+    return {
+      data: posts,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+      currentPage,
+    };
   }
-
-  // Ensure page and limit are valid
-  const currentPage = Math.max(1, page);
-  const pageSize = Math.max(1, limit);
-
-  // Get the user and following IDs
-  const user = await this.userService.findOne(_id);
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  const followingIds = user.following || [];
-
-  // Include the user's own posts in the timeline
-  const userAndFollowingIds = [_id, ...followingIds];
-
-  // Prepare query for timeline posts
-  const query = { userId: { $in: userAndFollowingIds } };
-
-  // Calculate skip
-  const skip = (currentPage - 1) * pageSize;
-
-  // Fetch posts with pagination
-  const [posts, total] = await Promise.all([
-    this.postModel
-      .find(query)
-      .sort({ createdAt: -1 }) // Sort by latest first
-      .skip(skip)
-      .limit(pageSize)
-      .lean(), // lean for performance
-
-    this.postModel.countDocuments(query),
-  ]);
-
-  return {
-    data: posts,
-    total,
-    totalPages: Math.ceil(total / pageSize),
-    currentPage,
-  };
-}
-
 
   //Yet to be implemented
   async remove(_id: UUID, postId: UUID): Promise<Post> {
@@ -384,12 +383,37 @@ export class PostsService {
     return createdPosts;
   }
 
-  async deletePostByUrl (urls: string[]): Promise<any> {
+  async deletePostByUrl(urls: string[]): Promise<any> {
     try {
       const result = await this.postModel.deleteMany({ url: { $in: urls } });
       return result;
     } catch (error) {
       throw new Error(`Error deleting posts by URL: ${error.message}`);
+    }
+  }
+
+  async updatePostByUrl(): Promise<any> {
+    try {
+      const result = await this.postModel.updateMany(
+        { img: { $regex: 'https://idoxe3r.sufydely.com/1' } },
+        [
+          {
+            $set: {
+              img: {
+                $replaceOne: {
+                  input: '$img',
+                  find: '/1/',
+                  replacement: '/',
+                },
+              },
+              updatedAt: new Date(),
+            },
+          },
+        ],
+      );
+      return result;
+    } catch (error) {
+      throw new Error(`Error updating posts by URL: ${error.message}`);
     }
   }
 }

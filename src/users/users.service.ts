@@ -138,4 +138,25 @@ export class UsersService {
     await user.save();
     return user;
   }
+
+  async getAllUserProfilePicture(): Promise<
+    { profilePicture: string | undefined; userId: string }[]
+  > {
+    try {
+      const res = await this.userModel
+        .find({ profilePicture: { $ne: null } })
+        .select('profilePicture _id')
+        .lean()
+        .exec();
+
+      return res.map((item) => ({
+        profilePicture: item.profilePicture,
+        userId: item._id.toString(), // safe conversion
+      }));
+    } catch (error) {
+      throw new Error(
+        `Error fetching user profile pictures: ${(error as Error).message}`,
+      );
+    }
+  }
 }

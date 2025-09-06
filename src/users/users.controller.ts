@@ -42,6 +42,18 @@ export class UsersController {
       return createErrorResponse(error.message, 400);
     }
   }
+
+  @Get('profilePics')
+  @UseGuards(JwtAuthGuard)
+  async getAllProfilePics(@Req() req: Request) {
+    try {
+      const profilePics = await this.usersService.getAllUserProfilePicture();
+      return createResponse(profilePics, 'Profile pictures fetched successfully');
+    } catch (error) {
+      return createErrorResponse(error.message, 400);
+    }
+  }
+  
   @Get(':id')
   async findOne(@Param('id') id: UUID) {
     try {
@@ -114,4 +126,6 @@ export class UsersController {
       return createErrorResponse(error.message, 400);
     }
   }
+
+  
 }
