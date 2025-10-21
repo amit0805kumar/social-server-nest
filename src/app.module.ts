@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
+import { GifModule } from './gif/gif.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -20,7 +21,7 @@ import { ChatGateway } from './chat/chat.gateway';
         uri: configService.get<string>('MONGO_URL'),
       }),
     }),
-    UsersModule, PostsModule, AuthModule],
+    UsersModule, PostsModule, AuthModule,GifModule],
   controllers: [AppController],
   providers: [AppService, ChatGateway],
 })
