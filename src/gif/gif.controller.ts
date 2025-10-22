@@ -39,11 +39,10 @@ export class GifController {
     @Get('all')
     @UseGuards(JwtAuthGuard)
     async findAll(
-        @Query('page') page = 1,
         @Query('limit') limit = 10,
     ) {
         try {
-            const gifs = await this.gifService.getAllGifs(page, limit);
+            const gifs = await this.gifService.getAllGifs(limit);
             return createResponse(gifs, 'GIFs fetched successfully');
         } catch (error) {
             return createErrorResponse(error);

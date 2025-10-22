@@ -26,30 +26,35 @@ export class GifService {
   }
 
   async getAllGifs(
-    page,
     limit,
   ): Promise<{
     data: Gif[];
     total: number;
     totalPages: number;
-    currentPage: number;
   }> {
     try {
+
+      if(limit == -1){
+        const data =  await this.gifModel.find().sort({createdAt: -1}).exec();
+        return {
+          data,
+          total: data.length,
+          totalPages: 1,
+        }
+      }
       // Ensure page and limit are valid
-      const currentPage = Math.max(1, page);
       const pageSize = Math.max(1, limit);
-      const skip = (currentPage - 1) * pageSize;
-      const [data, total] = await Promise.all([
-        this.gifModel.find().skip(skip).limit(pageSize).exec(),
-        this.gifModel.countDocuments().exec(),
-      ]);
+
+    const [data, total] = await Promise.all([
+      this.gifModel.aggregate([{ $sample: { size: pageSize } }]),
+      this.gifModel.countDocuments().exec(),
+    ]);
       const totalPages = Math.ceil(total / pageSize);
 
       return {
         data,
         total,
-        totalPages,
-        currentPage,
+        totalPages
       };
     } catch (error) {
       throw new Error('Error fetching GIFs');
